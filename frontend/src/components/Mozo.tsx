@@ -44,6 +44,13 @@ export const Mozo = () => {
                     {l.opciones?.map((o: any, idx: number) => (
                       <p key={idx} className="text-[10px] font-bold text-blue-600 uppercase italic">↳ {o.nombre_historico}</p>
                     ))}
+                    
+                    {/* Bloque agregado para mostrar las notas (ej: "con hielo") */}
+                    {l.notas_especiales && (
+                      <p className="mt-2 bg-yellow-200 p-1 px-2 text-[10px] font-black border-l-4 border-yellow-500 uppercase italic">
+                        "{l.notas_especiales}"
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

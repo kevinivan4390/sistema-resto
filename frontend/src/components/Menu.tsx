@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-// Interfaces actualizadas para coincidir con tu nuevo include de Prisma
 interface OpcionItem {
   id: number;
   nombre: string;
@@ -12,7 +11,7 @@ interface Producto {
   id: number;
   nombre: string;
   precio_actual: number;
-  // Estructura según tu schema: producto -> opciones -> grupo -> items
+  categorias?: { nombre: string };
   opciones: {
     grupo: {
       nombre: string;
@@ -33,9 +32,9 @@ interface ItemPedido {
 export const Menu = () => {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [pedidoActual, setPedidoActual] = useState<ItemPedido[]>([]);
+  const [mostrarDetalleCarrito, setMostrarDetalleCarrito] = useState(false);
   const [searchParams] = useSearchParams();
   
-  // Estados para el Modal
   const [productoParaPersonalizar, setProductoParaPersonalizar] = useState<Producto | null>(null);
   const [notaTemporal, setNotaTemporal] = useState("");
   const [opcionElegida, setOpcionElegida] = useState<OpcionItem | null>(null);
@@ -49,46 +48,51 @@ export const Menu = () => {
       .catch(err => console.error("Error cargando menú:", err));
   }, []);
 
+  const productosAgrupados = productos.reduce((acc: any, prod) => {
+    const catNombre = prod.categorias?.nombre || "Varios";
+    if (!acc[catNombre]) acc[catNombre] = [];
+    acc[catNombre].push(prod);
+    return acc;
+  }, {});
+
   const abrirModal = (prod: Producto) => {
     setProductoParaPersonalizar(prod);
     setNotaTemporal("");
-    setOpcionElegida(null); // Reseteamos la salsa/marca elegida
+    setOpcionElegida(null);
   };
 
   const confirmarPersonalizacionYAgregar = () => {
     if (!productoParaPersonalizar) return;
-
-    // Calculamos el precio sumando la opción si existe
     const precioBase = Number(productoParaPersonalizar.precio_actual);
     const adicional = opcionElegida ? Number(opcionElegida.precio_adicional) : 0;
     const precioFinal = precioBase + adicional;
 
-    setPedidoActual(prev => {
-      // Agregamos como un item nuevo para que no se pisen las notas/opciones de diferentes platos iguales
-      return [...prev, { 
-        productoId: productoParaPersonalizar.id, 
-        nombre: productoParaPersonalizar.nombre, 
-        cantidad: 1, 
-        precio: precioFinal,
-        notas: notaTemporal,
-        opcionesSeleccionadas: opcionElegida ? [{ 
-          id: opcionElegida.id, 
-          nombre: opcionElegida.nombre, 
-          precio: adicional 
-        }] : [] 
-      }];
-    });
-
+    setPedidoActual(prev => [...prev, { 
+      productoId: productoParaPersonalizar.id, 
+      nombre: productoParaPersonalizar.nombre, 
+      cantidad: 1, 
+      precio: precioFinal,
+      notas: notaTemporal,
+      opcionesSeleccionadas: opcionElegida ? [{ 
+        id: opcionElegida.id, 
+        nombre: opcionElegida.nombre, 
+        precio: adicional 
+      }] : [] 
+    }]);
     setProductoParaPersonalizar(null);
   };
 
-  const totalPedido = pedidoActual.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+  const eliminarItem = (index: number) => {
+    const nuevoPedido = [...pedidoActual];
+    nuevoPedido.splice(index, 1);
+    setPedidoActual(nuevoPedido);
+    if (nuevoPedido.length === 0) setMostrarDetalleCarrito(false);
+  };
 
-  const confirmarPedido = async () => {
+  const enviarPedidoAlBackend = async () => {
     if (pedidoActual.length === 0) return;
-
     try {
-      const res = await fetch('http://localhost:3000/api/pedidos', {
+      const response = await fetch('http://localhost:3000/api/pedidos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -98,124 +102,133 @@ export const Menu = () => {
         })
       });
 
-      if (res.ok) {
-        alert(`¡Pedido de la Mesa ${mesaId} enviado con éxito!`);
-        setPedidoActual([]); 
-      } else {
-        alert("Hubo un problema al enviar el pedido.");
+      if (response.ok) {
+        alert("¡Pedido enviado a cocina!");
+        setPedidoActual([]);
+        setMostrarDetalleCarrito(false);
       }
     } catch (error) {
-      console.error("Error:", error);
-      alert("No se pudo conectar con el servidor.");
+      console.error("Error enviando pedido:", error);
+      alert("No se pudo enviar el pedido.");
     }
   };
 
+  const totalPedido = pedidoActual.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+
   return (
-    <div className="p-6 bg-gray-900 min-h-screen text-white pb-32">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-orange-500 uppercase tracking-tighter italic">Resto-App</h1>
-        <p className="text-gray-400 mt-1">📍 Mesa Seleccionada: {mesaId || 'Ninguna'}</p>
-      </header>
+    <div style={{ backgroundColor: '#111827', minHeight: '100vh', paddingBottom: '140px', color: 'white', fontFamily: 'sans-serif' }}>
       
-      <div className="space-y-4">
-        {productos.map((prod) => (
-          <div key={prod.id} className="flex justify-between items-center bg-gray-800 p-5 rounded-2xl border border-gray-700 shadow-lg">
-            <div>
-              <h3 className="text-lg font-bold uppercase">{prod.nombre}</h3>
-              <p className="text-orange-400 font-mono text-xl font-bold">${Number(prod.precio_actual)}</p>
-            </div>
-            <button 
-              onClick={() => abrirModal(prod)}
-              className="bg-orange-600 hover:bg-orange-500 active:scale-90 w-12 h-12 rounded-xl font-bold text-2xl flex items-center justify-center transition-all shadow-lg"
-            >
-              +
-            </button>
-          </div>
-        ))}
-      </div>
+      <header style={{ padding: '20px', borderBottom: '1px solid #374151', marginBottom: '20px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#f97316', margin: 0 }}>RESTO-APP</h1>
+        <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '5px' }}>📍 MESA SELECCIONADA: {mesaId || '---'}</p>
+      </header>
 
-      {/* MODAL DE PERSONALIZACIÓN */}
-      {productoParaPersonalizar && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 z-50">
-          <div className="bg-gray-800 w-full max-w-md rounded-[2rem] p-8 border border-gray-700 shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h2 className="text-2xl font-black text-orange-500 uppercase mb-1">
-              {productoParaPersonalizar.nombre}
+      <main style={{ padding: '0 15px' }}>
+        {Object.keys(productosAgrupados).map(categoria => (
+          <section key={categoria} style={{ marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#f97316', marginBottom: '15px', textTransform: 'uppercase', borderLeft: '4px solid #f97316', paddingLeft: '10px' }}>
+              {categoria}
             </h2>
-            <p className="text-gray-400 mb-6 text-sm">Personalizá tu pedido:</p>
-
-            {/* RENDERIZADO DE GRUPOS DE OPCIONES (Salsas, Marcas, etc.) */}
-            {productoParaPersonalizar.opciones?.map((opc, idx) => (
-              <div key={idx} className="mb-6">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 ml-1">
-                  {opc.grupo.nombre}
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {opc.grupo.items.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setOpcionElegida(item)}
-                      className={`p-3 rounded-xl text-xs font-bold uppercase transition-all border-2 ${
-                        opcionElegida?.id === item.id 
-                        ? 'border-orange-500 bg-orange-500/10 text-orange-500' 
-                        : 'border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-500'
-                      }`}
-                    >
-                      {item.nombre}
-                      {Number(item.precio_adicional) > 0 && (
-                        <span className="block text-[9px] text-orange-300 mt-1">
-                          +${Number(item.precio_adicional)}
-                        </span>
-                      )}
-                    </button>
-                  ))}
+            <div style={{ display: 'grid', gap: '15px' }}>
+              {productosAgrupados[categoria].map((prod: Producto) => (
+                <div key={prod.id} style={{ backgroundColor: '#1f2937', padding: '20px', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #374151' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700' }}>{prod.nombre}</h3>
+                    <p style={{ margin: '5px 0 0', color: '#fb923c', fontWeight: '800', fontSize: '20px' }}>${Number(prod.precio_actual)}</p>
+                  </div>
+                  <button 
+                    onClick={() => abrirModal(prod)}
+                    style={{ backgroundColor: '#ea580c', color: 'white', width: '50px', height: '50px', borderRadius: '15px', border: 'none', fontSize: '24px', fontWeight: 'bold', cursor: 'pointer' }}
+                  >
+                    +
+                  </button>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </section>
+        ))}
+      </main>
 
-            <div className="mb-8">
-              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 ml-1">
-                Notas especiales
-              </label>
+      {productoParaPersonalizar && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'flex-end', zIndex: 100 }}>
+          <div style={{ backgroundColor: '#1f2937', width: '100%', padding: '30px', borderTopLeftRadius: '30px', borderTopRightRadius: '30px', maxHeight: '80vh', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: '900', color: '#f97316', textTransform: 'uppercase' }}>{productoParaPersonalizar.nombre}</h2>
+            <div style={{ margin: '25px 0' }}>
+              {productoParaPersonalizar.opciones?.map((opc, idx) => (
+                <div key={idx} style={{ marginBottom: '20px' }}>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1px' }}>{opc.grupo.nombre}</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                    {opc.grupo.items.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => setOpcionElegida(item)}
+                        style={{ padding: '12px', borderRadius: '12px', border: opcionElegida?.id === item.id ? '2px solid #f97316' : '2px solid #374151', backgroundColor: opcionElegida?.id === item.id ? 'rgba(249,115,22,0.1)' : '#111827', color: opcionElegida?.id === item.id ? '#f97316' : '#9ca3af', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase' }}
+                      >
+                        {item.nombre}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <label style={{ fontSize: '10px', fontWeight: '800', color: '#6b7280', textTransform: 'uppercase' }}>Notas especiales</label>
               <textarea 
-                className="w-full bg-gray-900 border border-gray-700 rounded-2xl p-4 text-white focus:outline-none focus:border-orange-500 transition-colors text-sm"
-                placeholder="Ej: Sin sal, bien cocido..."
+                style={{ width: '100%', backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '15px', padding: '15px', color: 'white', marginTop: '10px', boxSizing: 'border-box' }}
+                placeholder="Ej: Sin sal..."
                 rows={2}
                 value={notaTemporal}
                 onChange={(e) => setNotaTemporal(e.target.value)}
               />
             </div>
-
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setProductoParaPersonalizar(null)}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 py-4 rounded-2xl font-bold uppercase text-xs transition-colors"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={confirmarPersonalizacionYAgregar}
-                className="flex-1 bg-orange-600 hover:bg-orange-500 py-4 rounded-2xl font-bold uppercase text-xs transition-colors shadow-lg shadow-orange-900/20"
-              >
-                Agregar
-              </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setProductoParaPersonalizar(null)} style={{ flex: 1, padding: '15px', borderRadius: '15px', border: 'none', backgroundColor: '#374151', color: 'white', fontWeight: 'bold' }}>CERRAR</button>
+              <button onClick={confirmarPersonalizacionYAgregar} style={{ flex: 1, padding: '15px', borderRadius: '15px', border: 'none', backgroundColor: '#ea580c', color: 'white', fontWeight: 'bold' }}>AGREGAR</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Barra de pedido acumulado */}
       {pedidoActual.length > 0 && (
-        <div className="fixed bottom-6 left-4 right-4 bg-orange-600 p-5 rounded-[2rem] flex justify-between items-center shadow-2xl shadow-black ring-4 ring-gray-900">
-          <div>
-            <span className="text-[10px] uppercase font-black bg-orange-800 px-2 py-0.5 rounded-full">Mesa {mesaId}</span>
-            <p className="font-black text-2xl mt-1">${totalPedido.toLocaleString('es-AR')}</p>
+        <div style={{ position: 'fixed', bottom: '20px', left: '20px', right: '20px', zIndex: 90 }}>
+          {mostrarDetalleCarrito && (
+            <div style={{ backgroundColor: '#1f2937', borderRadius: '25px', padding: '20px', marginBottom: '10px', border: '2px solid #f97316', maxHeight: '40vh', overflowY: 'auto', boxShadow: '0 -10px 20px rgba(0,0,0,0.5)' }}>
+              <h4 style={{ margin: '0 0 15px', color: '#f97316', fontSize: '14px', fontWeight: '900', textTransform: 'uppercase' }}>Tu Pedido</h4>
+              {pedidoActual.map((item, index) => (
+                <div key={index} style={{ borderBottom: '1px solid #374151', padding: '12px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontWeight: 'bold', fontSize: '14px' }}>{item.nombre}</p>
+                    {item.opcionesSeleccionadas?.map(o => (
+                      <p key={o.id} style={{ margin: 0, fontSize: '11px', color: '#9ca3af' }}>↳ {o.nombre}</p>
+                    ))}
+                    {item.notas && <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#fb923c', fontStyle: 'italic' }}>"{item.notas}"</p>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <p style={{ margin: 0, fontWeight: '900', fontSize: '14px' }}>${item.precio}</p>
+                    <button 
+                      onClick={() => eliminarItem(index)}
+                      style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', width: '25px', height: '25px', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ backgroundColor: '#f97316', padding: '18px 25px', borderRadius: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+            <div onClick={() => setMostrarDetalleCarrito(!mostrarDetalleCarrito)} style={{ cursor: 'pointer', flex: 1 }}>
+              <p style={{ margin: 0, fontSize: '10px', fontWeight: '900', color: '#7c2d12', textTransform: 'uppercase' }}>
+                {pedidoActual.length} items {mostrarDetalleCarrito ? '▲' : '▼'}
+              </p>
+              <p style={{ margin: 0, fontSize: '24px', fontWeight: '900' }}>${totalPedido}</p>
+            </div>
+            <button 
+              onClick={enviarPedidoAlBackend}
+              style={{ backgroundColor: 'white', color: '#f97316', border: 'none', padding: '12px 25px', borderRadius: '15px', fontWeight: '900', textTransform: 'uppercase', fontSize: '12px', cursor: 'pointer' }}
+            >
+              Confirmar
+            </button>
           </div>
-          <button 
-            onClick={confirmarPedido}
-            className="bg-white text-orange-600 px-8 py-3 rounded-xl font-black text-xs uppercase tracking-tighter active:scale-95 transition-transform"
-          >
-            Confirmar Pedido
-          </button>
         </div>
       )}
     </div>

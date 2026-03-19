@@ -1,10 +1,14 @@
 {
   "name": "sistema-pedidos-qr",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Backend para gestión de pedidos por QR",
+  "main": "src/server.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon src/server.ts",
+    "start": "ts-node src/server.ts",
+    "build": "tsc",
+    "db:studio": "npx prisma studio",
+    "db:generate": "npx prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +23,7 @@
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
     "@types/qrcode": "^1.5.6",

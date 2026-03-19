@@ -4,10 +4,25 @@ import prisma from '../lib/prisma';
 export const createPedido = async (req: Request, res: Response) => {
     try {
         const { mesaId, items, total } = req.body;
+
+        // 1. Buscamos los productos en la DB para ver sus categorías
+        const productosDb = await prisma.productos.findMany({
+            where: {
+                id: { in: items.map((i: any) => i.productoId) }
+            },
+            include: { categorias: true }
+        });
+
+        // 2. Chequeamos si hay algo que deba ir a la cocina
+        const tieneCocina = productosDb.some(p => p.categorias?.destino === 'COCINA');
+
+        // 3. Si no hay nada de cocina, el pedido ya nace "LISTO"
+        const estadoInicial = tieneCocina ? 'PENDIENTE_STOCK' : 'LISTO';
+
         const nuevoPedido = await prisma.pedidos.create({
             data: {
                 sesion_id: Number(mesaId), 
-                estado: 'PENDIENTE_STOCK' as any,
+                estado: estadoInicial as any,
                 metodo_pago: 'CUENTA_ABIERTA_EFECTIVO' as any,
                 pagado: false,
                 subtotal: total as any,
@@ -28,6 +43,7 @@ export const createPedido = async (req: Request, res: Response) => {
                 }
             }
         });
+
         res.status(201).json(nuevoPedido);
     } catch (error) {
         console.error("ERROR AL CREAR PEDIDO:", error);

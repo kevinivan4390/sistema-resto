@@ -27,44 +27,118 @@ export const Mozo = () => {
   };
 
   return (
-    <div className="p-8 bg-slate-900 min-h-screen text-white font-sans">
-      <h1 className="text-4xl font-black mb-10 text-blue-400 uppercase italic border-b-4 border-blue-400 inline-block">Control de Salón</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div style={{ backgroundColor: '#111827', minHeight: '100vh', padding: '30px', color: 'white', fontFamily: 'sans-serif' }}>
+      
+      {/* HEADER ESTILO RESTO-APP */}
+      <header style={{ borderBottom: '1px solid #374151', marginBottom: '40px', paddingBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#f97316', margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>
+            Control de Salón
+          </h1>
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '5px', fontWeight: 'bold' }}>📋 SEGUIMIENTO DE MESAS</p>
+        </div>
+        <div style={{ backgroundColor: '#1f2937', padding: '10px 20px', borderRadius: '15px', border: '1px solid #374151' }}>
+          <span style={{ color: '#f97316', fontWeight: '900' }}>{pedidos.length}</span> MESAS ACTIVAS
+        </div>
+      </header>
+
+      {/* GRID DE MESAS */}
+      <main style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '25px' }}>
         {pedidos.map(p => (
-          <div key={p.id} className={`rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 ${p.estado === 'LISTO' ? 'bg-green-50 ring-8 ring-green-500 animate-pulse' : 'bg-white'}`}>
-            <div className={`p-6 text-center ${p.estado === 'LISTO' ? 'bg-green-500' : 'bg-red-600'} text-white`}>
-              <p className="font-black text-6xl italic leading-none">M{p.sesiones_mesa?.mesas?.numero}</p>
-              <p className="text-xs font-bold uppercase mt-2 tracking-widest">{p.estado === 'LISTO' ? '¡LISTO!' : 'EN MARCHA'}</p>
+          <div key={p.id} style={{ 
+            backgroundColor: '#1f2937', 
+            borderRadius: '25px', 
+            border: p.estado === 'LISTO' ? '3px solid #22c55e' : '2px solid #374151', 
+            overflow: 'hidden',
+            display: 'flex', 
+            flexDirection: 'column',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
+            animation: p.estado === 'LISTO' ? 'pulse 2s infinite' : 'none'
+          }}>
+            
+            {/* INDICADOR DE ESTADO SUPERIOR */}
+            <div style={{ 
+              padding: '25px', 
+              backgroundColor: p.estado === 'LISTO' ? '#22c55e' : '#374151',
+              textAlign: 'center',
+              color: 'white'
+            }}>
+              <p style={{ margin: 0, fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '2px', opacity: 0.8 }}>
+                {p.estado === 'LISTO' ? '¡PEDIDO LISTO!' : 'EN PREPARACIÓN'}
+              </p>
+              <h2 style={{ fontSize: '50px', fontWeight: '900', margin: '5px 0 0', fontStyle: 'italic', lineHeight: 1 }}>
+                M{p.sesiones_mesa?.mesas?.numero}
+              </h2>
             </div>
-            <div className="p-6 text-black">
-              <div className="space-y-4 mb-6">
+
+            {/* DETALLE DEL PEDIDO */}
+            <div style={{ padding: '20px', flexGrow: 1 }}>
+              <div style={{ marginBottom: '15px' }}>
                 {p.lineas_pedido.map((l: any) => (
-                  <div key={l.id} className="border-b border-gray-100 pb-2">
-                    <p className="font-black text-lg uppercase leading-tight">{l.cantidad}x {l.productos.nombre}</p>
+                  <div key={l.id} style={{ marginBottom: '12px', borderBottom: '1px solid #374151', paddingBottom: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <span style={{ color: p.estado === 'LISTO' ? '#22c55e' : '#f97316', fontWeight: '900' }}>{l.cantidad}x</span>
+                      <span style={{ fontWeight: '700', fontSize: '14px', textTransform: 'uppercase' }}>{l.productos.nombre}</span>
+                    </div>
+                    
                     {l.opciones?.map((o: any, idx: number) => (
-                      <p key={idx} className="text-[10px] font-bold text-blue-600 uppercase italic">↳ {o.nombre_historico}</p>
+                      <p key={idx} style={{ margin: '2px 0 0 25px', fontSize: '11px', color: '#9ca3af', fontWeight: 'bold', fontStyle: 'italic' }}>
+                        ↳ {o.nombre_historico}
+                      </p>
                     ))}
                     
-                    {/* Bloque agregado para mostrar las notas (ej: "con hielo") */}
                     {l.notas_especiales && (
-                      <p className="mt-2 bg-yellow-200 p-1 px-2 text-[10px] font-black border-l-4 border-yellow-500 uppercase italic">
-                        "{l.notas_especiales}"
-                      </p>
+                      <div style={{ backgroundColor: 'rgba(249,115,22,0.1)', padding: '5px 10px', marginTop: '6px', marginLeft: '20px', borderRadius: '8px', borderLeft: '3px solid #f97316' }}>
+                        <p style={{ margin: 0, fontSize: '11px', color: '#fb923c', fontWeight: 'bold' }}>
+                          📝 "{l.notas_especiales}"
+                        </p>
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* BOTÓN ENTREGAR */}
+            <div style={{ padding: '15px' }}>
               <button 
                 onClick={() => entregar(p.id)}
                 disabled={p.estado !== 'LISTO'}
-                className={`w-full py-4 rounded-2xl font-black uppercase transition-all shadow-lg ${p.estado === 'LISTO' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400'}`}
+                style={{ 
+                  width: '100%', 
+                  padding: '15px', 
+                  borderRadius: '15px', 
+                  border: 'none', 
+                  backgroundColor: p.estado === 'LISTO' ? '#22c55e' : '#111827', 
+                  color: p.estado === 'LISTO' ? 'white' : '#4b5563', 
+                  fontWeight: '900', 
+                  fontSize: '14px', 
+                  textTransform: 'uppercase',
+                  cursor: p.estado === 'LISTO' ? 'pointer' : 'not-allowed',
+                  transition: '0.3s'
+                }}
               >
-                {p.estado === 'LISTO' ? 'Entregar Pedido' : 'En Cocina...'}
+                {p.estado === 'LISTO' ? 'Confirmar Entrega ✓' : 'Esperando Cocina...'}
               </button>
             </div>
           </div>
         ))}
-      </div>
+      </main>
+
+      {/* ESTILO PARA LA ANIMACIÓN PULSE */}
+      <style>{`
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.02); box-shadow: 0 0 20px rgba(34, 197, 94, 0.4); }
+          100% { transform: scale(1); }
+        }
+      `}</style>
+
+      {pedidos.length === 0 && (
+        <div style={{ textAlign: 'center', gridColumn: '1 / -1', marginTop: '100px' }}>
+          <p style={{ color: '#6b7280', fontSize: '18px', fontWeight: 'bold' }}>No hay pedidos activos en el salón.</p>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model categorias {
+  id        Int         @id @default(autoincrement())
+  nombre    String      @unique @db.VarChar(100)
+  destino   String      @default("BAR") @db.VarChar(20) 
+  productos productos[]
+}
+
+model lineas_pedido {
+  id                        Int        @id @default(autoincrement())
+  pedido_id                 Int?
+  producto_id               Int?
+  cantidad                  Int
+  precio_unitario_historico Decimal    @db.Decimal(10, 2)
+  notas_especiales          String?
+  pedidos                   pedidos?   @relation(fields: [pedido_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  productos                 productos? @relation(fields: [producto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  opciones                  lineas_pedido_opciones[]
+}
+
+model mesas {
+  id            Int             @id @default(autoincrement())
+  numero        Int             @unique(map: "mesa_numero_unique")
+  qr_token      String?         @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  estado        estado_mesa?    @default(LIBRE)
+  sesiones_mesa sesiones_mesa[]
+}
+
+model pedidos {
+  id                 Int             @id @default(autoincrement())
+  sesion_id          Int?
+  usuario_id         Int?
+  estado             estado_pedido?  @default(PENDIENTE_STOCK)
+  metodo_pago        metodo_pago
+  pagado             Boolean?        @default(false)
+  subtotal           Decimal?        @default(0.00) @db.Decimal(10, 2)
+  creacion           DateTime?       @default(now()) @db.Timestamp(6)
+  motivo_cancelacion String?
+  lineas_pedido      lineas_pedido[]
+  sesiones_mesa      sesiones_mesa?  @relation(fields: [sesion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios           usuarios?       @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model productos {
+  id               Int             @id @default(autoincrement())
+  categoria_id     Int?
+  nombre           String          @db.VarChar(150)
+  precio_actual    Decimal         @db.Decimal(10, 2)
+  stock_disponible Int?            @default(0)
+  activo           Boolean?        @default(true)
+  lineas_pedido    lineas_pedido[]
+  categorias       categorias?     @relation(fields: [categoria_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  opciones         productos_opciones[]
+}
+
+model sesiones_mesa {
+  id              Int       @id @default(autoincrement())
+  mesa_id         Int?
+  apertura        DateTime? @default(now()) @db.Timestamp(6)
+  cierre          DateTime? @db.Timestamp(6)
+  cant_comensales Int?      @default(1)
+  total_acumulado Decimal?  @default(0.00) @db.Decimal(10, 2)
+  estado_sesion   String?   @default("ACTIVA") @db.VarChar(20)
+  pedidos         pedidos[]
+  mesas           mesas?    @relation(fields: [mesa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model usuarios {
+  id            Int         @id @default(autoincrement())
+  nombre        String      @db.VarChar(100)
+  email         String      @unique @db.VarChar(150)
+  password_hash String
+  rol           rol_usuario
+  pedidos       pedidos[]
+}
+
+enum estado_mesa {
+  LIBRE
+  OCUPADA
+  RESERVADA
+}
+
+enum estado_pedido {
+  PENDIENTE_STOCK
+  CANCELADO
+  EN_PREPARACION
+  LISTO
+  ENTREGADO
+}
+
+enum metodo_pago {
+  ONLINE_INMEDIATO
+  CUENTA_ABIERTA_EFECTIVO
+  CUENTA_ABIERTA_POSNET
+}
+
+enum rol_usuario {
+  ADMIN
+  MOZO
+  COCINERO
+}
+
+model opciones_grupos {
+  id           Int                  @id @default(autoincrement())
+  nombre       String               @db.VarChar(100)
+  obligatorio  Boolean              @default(false)
+  solo_una     Boolean              @default(true)
+  items        opciones_items[]
+  productos    productos_opciones[]
+}
+
+model opciones_items {
+  id                Int                        @id @default(autoincrement())
+  grupo_id          Int
+  nombre            String                     @db.VarChar(100)
+  precio_adicional  Decimal                    @default(0.00) @db.Decimal(10, 2)
+  grupo             opciones_grupos            @relation(fields: [grupo_id], references: [id], onDelete: Cascade)
+  pedido_opciones   lineas_pedido_opciones[]
+}
+
+model productos_opciones {
+  producto_id  Int
+  grupo_id     Int
+  producto     productos       @relation(fields: [producto_id], references: [id], onDelete: Cascade)
+  grupo        opciones_grupos @relation(fields: [grupo_id], references: [id], onDelete: Cascade)
+
+  @@id([producto_id, grupo_id])
+}
+
+model lineas_pedido_opciones {
+  id                Int            @id @default(autoincrement())
+  linea_pedido_id   Int
+  opcion_id         Int
+  nombre_historico  String?        @db.VarChar(100)
+  precio_historico  Decimal?       @db.Decimal(10, 2)
+  linea_pedido      lineas_pedido  @relation(fields: [linea_pedido_id], references: [id], onDelete: Cascade)
+  opcion            opciones_items @relation(fields: [opcion_id], references: [id])
+}
